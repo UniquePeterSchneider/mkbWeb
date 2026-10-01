@@ -177,11 +177,13 @@ def recipes():
 
     selected_id = request.args.get("selected", type=int)
     edit_mode = request.args.get("edit", "0") == "1" and selected_id is not None
+    searchterm = request.args.get("searchterm", "")
     return render_template(
         "recipes.html",
         recipes=recipes_data,
         selected_id=selected_id,
         edit_mode=edit_mode,
+        searchterm=searchterm,
     )
 
 
@@ -200,7 +202,32 @@ def recipe_new():
     )
     db.commit()
 
-    return redirect(url_for("recipes", selected=cursor.lastrowid, edit=1))
+    searchterm = request.form.get("searchterm", "")
+    return redirect(url_for("recipes", selected=cursor.lastrowid, edit=1, searchterm=searchterm))
+
+
+@app.route("/recipes/<int:recipe_id>/rename", methods=["POST"])
+@write_required
+def recipe_rename(recipe_id):
+    name = request.form.get("name", "").strip()
+    searchterm = request.form.get("searchterm", "")
+
+    if not name:
+        flash("An entry name is required.", "warning")
+        return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
+
+    db = get_db()
+    result = db.execute(
+        "UPDATE entries SET name = ? WHERE id = ?",
+        (name, recipe_id),
+    )
+    db.commit()
+
+    if result.rowcount == 0:
+        abort(404)
+
+    flash("Entry renamed.", "success")
+    return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
 
 @app.route("/recipes/<int:recipe_id>/edit", methods=["POST"])
@@ -208,10 +235,11 @@ def recipe_new():
 def recipe_edit(recipe_id):
     name = request.form.get("name", "").strip()
     text = request.form.get("text", "")
+    searchterm = request.form.get("searchterm", "")
 
     if not name:
         flash("A recipe name is required.", "warning")
-        return redirect(url_for("recipes", selected=recipe_id, edit=1))
+        return redirect(url_for("recipes", selected=recipe_id, edit=1, searchterm=searchterm))
 
     db = get_db()
     result = db.execute(
@@ -224,12 +252,13 @@ def recipe_edit(recipe_id):
         abort(404)
 
     flash("Recipe saved.", "success")
-    return redirect(url_for("recipes", selected=recipe_id))
+    return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
 
 @app.route("/recipes/<int:recipe_id>/delete", methods=["POST"])
 @write_required
 def recipe_delete(recipe_id):
+    searchterm = request.form.get("searchterm", "")
     db = get_db()
     result = db.execute("DELETE FROM entries WHERE id = ?", (recipe_id,))
     db.commit()
@@ -238,7 +267,7 @@ def recipe_delete(recipe_id):
         abort(404)
 
     flash("Recipe deleted.", "success")
-    return redirect(url_for("recipes"))
+    return redirect(url_for("recipes", searchterm=searchterm))
 
 
 @app.errorhandler(403)

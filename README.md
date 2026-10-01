@@ -58,3 +58,10 @@ There is no reader password and no user table.
 ## Markdown
 
 Recipe descriptions are stored as Markdown text. The edit view has a Markdown input and a live preview. Displayed Markdown is sanitized before being inserted into the page.
+
+
+## Recent UI behavior
+
+- Success messages such as "Recipe saved." and "Recipe deleted." automatically disappear after 3 seconds.
+- Editor mode includes a Rename button next to New. Rename opens a small modal and preserves the current search phrase.
+- The current search phrase is carried through create, rename, edit/save, and delete redirects, so it remains in the search box after those operations.

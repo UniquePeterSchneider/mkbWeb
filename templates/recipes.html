@@ -237,7 +237,7 @@
           class="form-control search-input"
           id="searchterm"
           type="search"
-          placeholder="search..."
+          placeholder="searchterm"
           autocomplete="off"
           spellcheck="false"
         >
@@ -253,6 +253,7 @@
 
         <div id="edit-mode" class="h-100 d-none">
           <form id="edit-form" method="post">
+            <input type="hidden" name="searchterm" id="edit-searchterm">
             <div class="mb-3">
               <label for="edit-name" class="editor-label">Name</label>
               <input class="form-control" id="edit-name" name="name" required>
@@ -285,6 +286,7 @@
       <div class="toolbar">
         {% if current_role == 'write' %}
           <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newRecipeModal">New</button>
+          <button type="button" class="btn btn-outline-secondary" id="rename-button">Rename</button>
           <button type="button" class="btn btn-outline-secondary" id="edit-button">Edit</button>
           <button type="button" class="btn btn-outline-danger" id="delete-button">Delete</button>
         {% endif %}
@@ -298,6 +300,7 @@
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <form method="post" action="{{ url_for('recipe_new') }}">
+        <input type="hidden" name="searchterm" class="modal-searchterm">
         <div class="modal-header">
           <h2 class="modal-title fs-5" id="newRecipeModalLabel">New entry</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -315,10 +318,33 @@
   </div>
 </div>
 
+<div class="modal fade" id="renameRecipeModal" tabindex="-1" aria-labelledby="renameRecipeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <form id="rename-form" method="post">
+        <input type="hidden" name="searchterm" class="modal-searchterm">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="renameRecipeModalLabel">Rename entry</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label for="rename-name" class="form-label">Name</label>
+          <input class="form-control" id="rename-name" name="name" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Rename</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="deleteRecipeModal" tabindex="-1" aria-labelledby="deleteRecipeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <form id="delete-form" method="post">
+        <input type="hidden" name="searchterm" class="modal-searchterm">
         <div class="modal-header">
           <h2 class="modal-title fs-5" id="deleteRecipeModalLabel">Delete entry</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -344,8 +370,10 @@
   const recipes = {{ recipes|tojson }};
   let selectedId = {{ selected_id|tojson }};
   let editing = {{ 'true' if edit_mode else 'false' }};
+  const initialSearchterm = {{ searchterm|tojson }};
 
   const searchInput = document.getElementById('searchterm');
+  searchInput.value = initialSearchterm;
   const entryList = document.getElementById('entry-list');
   const noResults = document.getElementById('no-results');
   const recipeView = document.getElementById('recipe-view');
@@ -357,8 +385,12 @@
   const editDescription = document.getElementById('edit-description');
   const editPreview = document.getElementById('edit-preview');
   const editButton = document.getElementById('edit-button');
+  const renameButton = document.getElementById('rename-button');
   const deleteButton = document.getElementById('delete-button');
   const cancelEdit = document.getElementById('cancel-edit');
+  const editSearchterm = document.getElementById('edit-searchterm');
+  const renameForm = document.getElementById('rename-form');
+  const renameName = document.getElementById('rename-name');
   const deleteForm = document.getElementById('delete-form');
   const deleteRecipeName = document.getElementById('delete-recipe-name');
 
@@ -415,6 +447,7 @@
     editMode.classList.remove('d-none');
     editName.value = recipe.name;
     editDescription.value = recipe.text;
+    editSearchterm.value = searchInput.value;
     editForm.action = `/recipes/${recipe.id}/edit`;
     renderEditorPreview();
     editDescription.focus();
@@ -427,6 +460,7 @@
     if (!recipe) {
       recipeView.classList.add('d-none');
       emptyState.classList.remove('d-none');
+      if (renameButton) renameButton.disabled = true;
       if (editButton) editButton.disabled = true;
       if (deleteButton) deleteButton.disabled = true;
       return;
@@ -435,6 +469,7 @@
     emptyState.classList.add('d-none');
     recipeView.classList.remove('d-none');
     recipeView.innerHTML = recipe.text_html || '<span class="text-secondary">No description.</span>';
+    if (renameButton) renameButton.disabled = false;
     if (editButton) editButton.disabled = false;
     if (deleteButton) deleteButton.disabled = false;
   }
@@ -452,8 +487,6 @@
     button.addEventListener('click', () => selectRecipe(Number(button.dataset.recipeId)));
   });
 
-  searchInput.addEventListener('input', filterEntries);
-
   if (editButton) {
     editButton.addEventListener('click', showEditMode);
   }
@@ -464,6 +497,31 @@
 
   if (editDescription) {
     editDescription.addEventListener('input', renderEditorPreview);
+  }
+
+  searchInput.addEventListener('input', () => {
+    editSearchterm.value = searchInput.value;
+    document.querySelectorAll('.modal-searchterm').forEach(input => {
+      input.value = searchInput.value;
+    });
+    filterEntries();
+  });
+
+  document.querySelectorAll('.modal-searchterm').forEach(input => {
+    input.value = searchInput.value;
+  });
+
+  if (renameButton) {
+    renameButton.addEventListener('click', () => {
+      const recipe = currentRecipe();
+      if (!recipe) return;
+      renameName.value = recipe.name;
+      renameForm.action = `/recipes/${recipe.id}/rename`;
+      document.querySelectorAll('#renameRecipeModal .modal-searchterm').forEach(input => {
+        input.value = searchInput.value;
+      });
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('renameRecipeModal')).show();
+    });
   }
 
   if (deleteButton) {
