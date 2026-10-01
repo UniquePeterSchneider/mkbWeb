@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} - Recipe Manager{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="alert alert-danger">
+    <h1 class="h4">Error {{ code }}</h1>
+    <p class="mb-0">{{ message }}</p>
+  </div>
+</div>
+{% endblock %}

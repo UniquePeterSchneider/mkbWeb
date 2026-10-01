@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Login - Recipe Manager{% endblock %}
+
+{% block head %}
+<style>
+  .login-page {
+    min-height: calc(100vh - 56px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  .login-card {
+    width: min(37.2rem, 100%);
+    border: 2px solid #5f5f5f;
+    border-radius: 3rem;
+    background: #f4f4f4;
+    box-shadow: none;
+  }
+
+  .login-card .card-body {
+    padding: 1.95rem 1.2rem 1.8rem;
+  }
+
+  .login-title {
+    color: #5d5d5d;
+    font-size: clamp(1.5rem, 3vw, 2.05rem);
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+
+  .login-input {
+    display: block;
+    width: min(21.6rem, 90%);
+    height: 2.7rem;
+    margin: 0 auto 1.2rem;
+    border: 0;
+    border-radius: .55rem;
+    font-size: 1.2rem;
+    text-align: center;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .login-input:focus {
+    box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .18);
+  }
+
+  .login-button,
+  .readonly-button {
+    display: block;
+    width: min(21.6rem, 90%);
+    min-height: 2.4rem;
+    margin: 0 auto;
+    border: 2px solid #5f5f5f;
+    border-radius: .5rem;
+    background: transparent;
+    color: #111;
+    font-size: 1.2rem;
+  }
+
+  .login-button:hover,
+  .readonly-button:hover {
+    background: #e9ecef;
+    color: #111;
+    border-color: #444;
+  }
+
+  .login-or {
+    margin: 1.3rem 0 1.25rem;
+    color: #5d5d5d;
+    font-size: 1.2rem;
+    text-align: center;
+  }
+
+  .login-error {
+    width: min(21.6rem, 90%);
+    margin: 0 auto .75rem;
+  }
+
+  @media (max-width: 576px) {
+    .login-card {
+      border-radius: 1.75rem;
+    }
+    .login-card .card-body {
+      padding: 1.5rem .8rem 1.4rem;
+    }
+    .login-button,
+    .readonly-button {
+      font-size: 1.1rem;
+    }
+    .login-input {
+      font-size: 1.1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-page">
+  <div class="card login-card">
+    <div class="card-body">
+      <h1 class="login-title">Editor password</h1>
+
+      <form method="post" autocomplete="on">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+        <label class="visually-hidden" for="editor-password">Editor password</label>
+        <input
+          class="form-control login-input"
+          id="editor-password"
+          name="password"
+          type="password"
+          required
+          autofocus
+          autocomplete="current-password"
+        >
+        <button class="btn login-button" type="submit">Login</button>
+      </form>
+
+      <div class="login-or">or</div>
+
+      <form method="post" action="{{ url_for('enter_read_only') }}">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+        <button class="btn readonly-button" type="submit">Enter Read Only</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
