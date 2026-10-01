@@ -1,6 +1,6 @@
 .venv/
 __pycache__/
 *.py[cod]
-recipes.db
+mkb.db
 .env
 .DS_Store

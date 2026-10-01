@@ -237,7 +237,7 @@
           class="form-control search-input"
           id="searchterm"
           type="search"
-          placeholder="searchterm"
+          placeholder="search..."
           autocomplete="off"
           spellcheck="false"
         >
@@ -264,7 +264,7 @@
                 <textarea
                   class="form-control editor-textarea"
                   id="edit-description"
-                  name="description"
+                  name="text"
                   spellcheck="true"
                 ></textarea>
               </div>
@@ -384,7 +384,7 @@
 
     document.querySelectorAll('.entry-item').forEach(button => {
       const recipe = recipes.find(item => item.id === Number(button.dataset.recipeId));
-      const haystack = `${recipe.name}\n${recipe.description}`.toLocaleLowerCase();
+      const haystack = `${recipe.name}\n${recipe.text}`.toLocaleLowerCase();
       const matches = !term || haystack.includes(term);
       button.classList.toggle('d-none', !matches);
       if (matches) visible += 1;
@@ -414,7 +414,7 @@
     viewMode.classList.add('d-none');
     editMode.classList.remove('d-none');
     editName.value = recipe.name;
-    editDescription.value = recipe.description;
+    editDescription.value = recipe.text;
     editForm.action = `/recipes/${recipe.id}/edit`;
     renderEditorPreview();
     editDescription.focus();
@@ -434,7 +434,7 @@
 
     emptyState.classList.add('d-none');
     recipeView.classList.remove('d-none');
-    recipeView.innerHTML = recipe.description_html || '<span class="text-secondary">No description.</span>';
+    recipeView.innerHTML = recipe.text_html || '<span class="text-secondary">No description.</span>';
     if (editButton) editButton.disabled = false;
     if (deleteButton) deleteButton.disabled = false;
   }

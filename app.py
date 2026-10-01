@@ -10,9 +10,9 @@ from markupsafe import Markup
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "recipes.db"))
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "mkb.db"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-EDITOR_PASSWORD = os.environ.get("EDITOR_PASSWORD")
+EDITOR_PASSWORD = "editor"
 
 if not EDITOR_PASSWORD:
     raise RuntimeError("Set EDITOR_PASSWORD environment variable.")
@@ -51,10 +51,10 @@ def init_db():
     db = get_db()
     db.execute(
         """
-        CREATE TABLE IF NOT EXISTS recipe (
+        CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            description TEXT NOT NULL DEFAULT ''
+            text TEXT NOT NULL DEFAULT ''
         )
         """
     )
@@ -163,14 +163,14 @@ def index():
 @login_required
 def recipes():
     rows = get_db().execute(
-        "SELECT id, name, description FROM recipe ORDER BY name COLLATE NOCASE"
+        "SELECT id, name, text FROM entries ORDER BY name COLLATE NOCASE"
     ).fetchall()
     recipes_data = [
         {
             "id": row["id"],
             "name": row["name"],
-            "description": row["description"],
-            "description_html": render_markdown(row["description"]),
+            "text": row["text"],
+            "text_html": render_markdown(row["text"]),
         }
         for row in rows
     ]
@@ -195,7 +195,7 @@ def recipe_new():
 
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO recipe (name, description) VALUES (?, ?)",
+        "INSERT INTO entries (name, text) VALUES (?, ?)",
         (name, ""),
     )
     db.commit()
@@ -207,7 +207,7 @@ def recipe_new():
 @write_required
 def recipe_edit(recipe_id):
     name = request.form.get("name", "").strip()
-    description = request.form.get("description", "")
+    text = request.form.get("text", "")
 
     if not name:
         flash("A recipe name is required.", "warning")
@@ -215,8 +215,8 @@ def recipe_edit(recipe_id):
 
     db = get_db()
     result = db.execute(
-        "UPDATE recipe SET name = ?, description = ? WHERE id = ?",
-        (name, description, recipe_id),
+        "UPDATE entries SET name = ?, text = ? WHERE id = ?",
+        (name, text, recipe_id),
     )
     db.commit()
 
@@ -231,7 +231,7 @@ def recipe_edit(recipe_id):
 @write_required
 def recipe_delete(recipe_id):
     db = get_db()
-    result = db.execute("DELETE FROM recipe WHERE id = ?", (recipe_id,))
+    result = db.execute("DELETE FROM entries WHERE id = ?", (recipe_id,))
     db.commit()
 
     if result.rowcount == 0:

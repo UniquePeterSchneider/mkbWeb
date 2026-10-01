@@ -4,12 +4,12 @@ Small Flask + SQLite recipe web application.
 
 ## Features
 
-- One SQLite table: `recipe`
+- One SQLite table: `entries`
 - Two fixed access modes:
   - **Editor**: protected by an editor password; can search, create, edit, and delete recipes
   - **Read Only**: no password; can search and view recipes
-- Live substring search across both `recipe.name` and `recipe.description`
-- Markdown stored in `recipe.description`
+- Live substring search across both `entries.name` and `entries.text`
+- Markdown stored in `entries.text`
 - Live Markdown preview while editing
 - Sanitized Markdown HTML when displayed
 - Bootstrap 5 loaded from jsDelivr
@@ -40,10 +40,10 @@ python app.py
 
 Then open `http://127.0.0.1:5000`.
 
-By default the SQLite database is `recipes.db` next to `app.py`. For a hosted service with persistent storage, set for example:
+By default the SQLite database is `mkb.db` next to `app.py`. For a hosted service with persistent storage, set for example:
 
 ```text
-DATABASE_PATH=/var/data/recipes.db
+DATABASE_PATH=/var/data/mkb.db
 ```
 
 ## Login behavior
