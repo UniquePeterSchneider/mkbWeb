@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "mkb.db"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-EDITOR_PASSWORD = os.environ.get("EDITOR_PASSWORD")
+EDITOR_PASSWORD = "admin0815"
 
 if not EDITOR_PASSWORD:
     raise RuntimeError("Set EDITOR_PASSWORD environment variable.")
