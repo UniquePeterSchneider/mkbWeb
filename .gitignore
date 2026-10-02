@@ -4,3 +4,4 @@ __pycache__/
 mkb.db
 .env
 .DS_Store
+.idea/

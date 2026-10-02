@@ -138,15 +138,83 @@
 
   .toolbar {
     display: flex;
-    justify-content: flex-end;
+    width: 100%;
     gap: 1rem;
     padding-top: 1.05rem;
   }
 
   .toolbar .btn {
-    min-width: 10rem;
+    flex: 1 1 0;
+    min-width: 0;
     font-size: 1.1rem;
     padding: .55rem 1rem;
+  }
+
+  .print-area {
+    display: none;
+  }
+
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 18mm;
+    }
+
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
+      background: #fff !important;
+    }
+
+    body * {
+      visibility: hidden !important;
+    }
+
+    .print-area,
+    .print-area * {
+      visibility: visible !important;
+    }
+
+    .print-area {
+      display: block !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      color: #000 !important;
+      background: #fff !important;
+      font-size: 11pt;
+      line-height: 1.5;
+    }
+
+    .print-area h1 {
+      font-size: 22pt;
+      margin: 0 0 12pt;
+    }
+
+    .print-area h2 { font-size: 17pt; }
+    .print-area h3 { font-size: 14pt; }
+    .print-area p,
+    .print-area ul,
+    .print-area ol,
+    .print-area blockquote,
+    .print-area pre {
+      margin-bottom: 9pt;
+    }
+
+    .print-area pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid #ccc;
+      padding: 8pt;
+    }
+
+    .print-area a {
+      color: #000 !important;
+      text-decoration: underline;
+    }
   }
 
   #edit-form {
@@ -290,9 +358,15 @@
           <button type="button" class="btn btn-outline-secondary" id="edit-button">Edit</button>
           <button type="button" class="btn btn-outline-danger" id="delete-button">Delete</button>
         {% endif %}
+        <button type="button" class="btn btn-outline-dark" id="print-button">Print</button>
       </div>
     </section>
   </div>
+</div>
+
+<div class="print-area" id="print-area">
+  <h1 id="print-title"></h1>
+  <div id="print-content" class="recipe-description"></div>
 </div>
 
 {% if current_role == 'write' %}
@@ -371,6 +445,8 @@
   let selectedId = {{ selected_id|tojson }};
   let editing = {{ 'true' if edit_mode else 'false' }};
   const initialSearchterm = {{ searchterm|tojson }};
+  const initialEditName = {{ edit_name_value|tojson }};
+  const initialEditText = {{ edit_text_value|tojson }};
 
   const searchInput = document.getElementById('searchterm');
   searchInput.value = initialSearchterm;
@@ -393,6 +469,9 @@
   const renameName = document.getElementById('rename-name');
   const deleteForm = document.getElementById('delete-form');
   const deleteRecipeName = document.getElementById('delete-recipe-name');
+  const printButton = document.getElementById('print-button');
+  const printTitle = document.getElementById('print-title');
+  const printContent = document.getElementById('print-content');
 
   function currentRecipe() {
     return recipes.find(recipe => recipe.id === selectedId) || null;
@@ -412,19 +491,31 @@
 
   function filterEntries() {
     const term = searchInput.value.trim().toLocaleLowerCase();
-    let visible = 0;
+    const visibleIds = [];
 
     document.querySelectorAll('.entry-item').forEach(button => {
       const recipe = recipes.find(item => item.id === Number(button.dataset.recipeId));
       const haystack = `${recipe.name}\n${recipe.text}`.toLocaleLowerCase();
       const matches = !term || haystack.includes(term);
       button.classList.toggle('d-none', !matches);
-      if (matches) visible += 1;
+      if (matches) visibleIds.push(recipe.id);
     });
 
+    const visible = visibleIds.length;
     noResults.classList.toggle('d-none', visible !== 0);
 
-    if (selectedId && visible === 0) {
+    // The first matching entry becomes the selection whenever the search changes.
+    // This also loads its description immediately in the right-hand panel.
+    if (visible > 0) {
+      const firstVisibleId = visibleIds[0];
+      if (selectedId !== firstVisibleId || editing) {
+        selectedId = firstVisibleId;
+        editing = false;
+        showViewMode();
+      } else {
+        updateSelectionStyles();
+      }
+    } else {
       selectedId = null;
       editing = false;
       showViewMode();
@@ -445,8 +536,8 @@
     editing = true;
     viewMode.classList.add('d-none');
     editMode.classList.remove('d-none');
-    editName.value = recipe.name;
-    editDescription.value = recipe.text;
+    editName.value = initialEditName !== null ? initialEditName : recipe.name;
+    editDescription.value = initialEditText !== null ? initialEditText : recipe.text;
     editSearchterm.value = searchInput.value;
     editForm.action = `/recipes/${recipe.id}/edit`;
     renderEditorPreview();
@@ -460,6 +551,7 @@
     if (!recipe) {
       recipeView.classList.add('d-none');
       emptyState.classList.remove('d-none');
+      if (printButton) printButton.disabled = true;
       if (renameButton) renameButton.disabled = true;
       if (editButton) editButton.disabled = true;
       if (deleteButton) deleteButton.disabled = true;
@@ -469,6 +561,7 @@
     emptyState.classList.add('d-none');
     recipeView.classList.remove('d-none');
     recipeView.innerHTML = recipe.text_html || '<span class="text-secondary">No description.</span>';
+    if (printButton) printButton.disabled = false;
     if (renameButton) renameButton.disabled = false;
     if (editButton) editButton.disabled = false;
     if (deleteButton) deleteButton.disabled = false;
@@ -521,6 +614,16 @@
         input.value = searchInput.value;
       });
       bootstrap.Modal.getOrCreateInstance(document.getElementById('renameRecipeModal')).show();
+    });
+  }
+
+  if (printButton) {
+    printButton.addEventListener('click', () => {
+      const recipe = currentRecipe();
+      if (!recipe) return;
+      printTitle.textContent = recipe.name;
+      printContent.innerHTML = recipe.text_html || '<em>No description.</em>';
+      window.print();
     });
   }
 

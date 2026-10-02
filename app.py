@@ -1,3 +1,4 @@
+import logging
 import os
 import sqlite3
 from functools import wraps
@@ -12,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "mkb.db"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-EDITOR_PASSWORD = "editor"
+EDITOR_PASSWORD = os.environ.get("EDITOR_PASSWORD")
 
 if not EDITOR_PASSWORD:
     raise RuntimeError("Set EDITOR_PASSWORD environment variable.")
@@ -23,6 +24,7 @@ EDITOR_PASSWORD_HASH = generate_password_hash(
 )
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 app.config.update(
     SECRET_KEY=SECRET_KEY,
     SESSION_COOKIE_HTTPONLY=True,
@@ -159,9 +161,7 @@ def index():
     return redirect(url_for("recipes"))
 
 
-@app.route("/recipes")
-@login_required
-def recipes():
+def render_recipe_page(selected_id=None, edit_mode=False, searchterm="", edit_name_value=None, edit_text_value=None):
     rows = get_db().execute(
         "SELECT id, name, text FROM entries ORDER BY name COLLATE NOCASE"
     ).fetchall()
@@ -174,13 +174,24 @@ def recipes():
         }
         for row in rows
     ]
-
-    selected_id = request.args.get("selected", type=int)
-    edit_mode = request.args.get("edit", "0") == "1" and selected_id is not None
-    searchterm = request.args.get("searchterm", "")
     return render_template(
         "recipes.html",
         recipes=recipes_data,
+        selected_id=selected_id,
+        edit_mode=edit_mode,
+        searchterm=searchterm,
+        edit_name_value=edit_name_value,
+        edit_text_value=edit_text_value,
+    )
+
+
+@app.route("/recipes")
+@login_required
+def recipes():
+    selected_id = request.args.get("selected", type=int)
+    edit_mode = request.args.get("edit", "0") == "1" and selected_id is not None
+    searchterm = request.args.get("searchterm", "")
+    return render_recipe_page(
         selected_id=selected_id,
         edit_mode=edit_mode,
         searchterm=searchterm,
@@ -196,13 +207,19 @@ def recipe_new():
         return redirect(url_for("recipes"))
 
     db = get_db()
-    cursor = db.execute(
-        "INSERT INTO entries (name, text) VALUES (?, ?)",
-        (name, ""),
-    )
-    db.commit()
-
     searchterm = request.form.get("searchterm", "")
+    try:
+        cursor = db.execute(
+            "INSERT INTO entries (name, text) VALUES (?, ?)",
+            (name, ""),
+        )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        logger.exception("Failed to create entry")
+        flash("The entry could not be created. Please try again.", "danger")
+        return redirect(url_for("recipes", searchterm=searchterm))
+
     return redirect(url_for("recipes", selected=cursor.lastrowid, edit=1, searchterm=searchterm))
 
 
@@ -217,16 +234,21 @@ def recipe_rename(recipe_id):
         return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
     db = get_db()
-    result = db.execute(
-        "UPDATE entries SET name = ? WHERE id = ?",
-        (name, recipe_id),
-    )
-    db.commit()
+    try:
+        result = db.execute(
+            "UPDATE entries SET name = ? WHERE id = ?",
+            (name, recipe_id),
+        )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        logger.exception("Failed to rename entry %s", recipe_id)
+        flash("The entry could not be renamed. Please try again.", "danger")
+        return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
     if result.rowcount == 0:
         abort(404)
 
-    flash("Entry renamed.", "success")
     return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
 
@@ -242,16 +264,27 @@ def recipe_edit(recipe_id):
         return redirect(url_for("recipes", selected=recipe_id, edit=1, searchterm=searchterm))
 
     db = get_db()
-    result = db.execute(
-        "UPDATE entries SET name = ?, text = ? WHERE id = ?",
-        (name, text, recipe_id),
-    )
-    db.commit()
+    try:
+        result = db.execute(
+            "UPDATE entries SET name = ?, text = ? WHERE id = ?",
+            (name, text, recipe_id),
+        )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        logger.exception("Failed to save entry %s", recipe_id)
+        flash("The entry could not be saved. Your changes are still in the editor.", "danger")
+        return render_recipe_page(
+            selected_id=recipe_id,
+            edit_mode=True,
+            searchterm=searchterm,
+            edit_name_value=name,
+            edit_text_value=text,
+        )
 
     if result.rowcount == 0:
         abort(404)
 
-    flash("Recipe saved.", "success")
     return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
 
@@ -260,13 +293,18 @@ def recipe_edit(recipe_id):
 def recipe_delete(recipe_id):
     searchterm = request.form.get("searchterm", "")
     db = get_db()
-    result = db.execute("DELETE FROM entries WHERE id = ?", (recipe_id,))
-    db.commit()
+    try:
+        result = db.execute("DELETE FROM entries WHERE id = ?", (recipe_id,))
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        logger.exception("Failed to delete entry %s", recipe_id)
+        flash("The entry could not be deleted. Please try again.", "danger")
+        return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
     if result.rowcount == 0:
         abort(404)
 
-    flash("Recipe deleted.", "success")
     return redirect(url_for("recipes", searchterm=searchterm))
 
 
