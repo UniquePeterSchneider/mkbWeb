@@ -5,3 +5,4 @@ mkb.db
 .env
 .DS_Store
 .idea/
+access.txt

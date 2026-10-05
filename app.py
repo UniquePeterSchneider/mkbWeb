@@ -14,7 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "mkb.db"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-EDITOR_PASSWORD = "admin0815"
+EDITOR_PASSWORD = os.environ.get("EDITOR_PASSWORD")
 
 if not EDITOR_PASSWORD:
     raise RuntimeError("Set EDITOR_PASSWORD environment variable.")
@@ -38,8 +38,8 @@ app.config.update(
 def get_db():
     if 'db' not in g:
         g.db = libsql_client.create_client_sync(
-            url="https://mkb-uniquepeterschneider.aws-eu-west-1.turso.io", # os.environ.get("TURSO_DATABASE_URL"),
-            auth_token="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA5NTEzNDcsImlkIjoiMDFhMGZjZGYtZGMwMS03YTFjLWEzODUtYjJmYjM5MTlhMzhkIiwia2lkIjoiNjVRSlhuSm0wSk5YcWVRM3FOTk5ZbklGa3pPeWlSTEhZSzllcExqd29CWSIsInJpZCI6Ijc4MjM5MWE3LTQ3YzMtNGJjNS1hMGExLWU2MTkxMGU4NzE4YSJ9.jAnAPzeiHqYkpgnlvy-g4QEuPbQw7lz7sFMA1uY2WgSeQkvAG509_nkaMfS-xXguIxzjtobRxBWFMWGX6FlCCg" # os.environ.get("TURSO_AUTH_TOKEN")
+            url = os.environ.get("TURSO_DATABASE_URL", ""), # os.environ.get("TURSO_DATABASE_URL"),
+            auth_token=os.environ.get("TURSO_AUTH_TOKEN") # os.environ.get("TURSO_AUTH_TOKEN")
         )
     return g.db
 
