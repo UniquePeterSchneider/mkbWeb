@@ -621,7 +621,7 @@
     printButton.addEventListener('click', () => {
       const recipe = currentRecipe();
       if (!recipe) return;
-      printTitle.textContent = recipe.name;
+      printTitle.textContent = "\n" + recipe.name;
       printContent.innerHTML = recipe.text_html || '<em>No description.</em>';
       window.print();
     });
