@@ -3,6 +3,7 @@ import os
 import sqlite3
 from functools import wraps
 from pathlib import Path
+import libsql_client
 
 import bleach
 import markdown
@@ -13,7 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", BASE_DIR / "mkb.db"))
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-EDITOR_PASSWORD = os.environ.get("EDITOR_PASSWORD")
+EDITOR_PASSWORD = "admin0815"
 
 if not EDITOR_PASSWORD:
     raise RuntimeError("Set EDITOR_PASSWORD environment variable.")
@@ -33,21 +34,20 @@ app.config.update(
 )
 
 
+# Initialize Turso / libSQL client
 def get_db():
-    if "db" not in g:
-        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        g.db = sqlite3.connect(DATABASE_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+    if 'db' not in g:
+        g.db = libsql_client.create_client_sync(
+            url="https://mkb-uniquepeterschneider.aws-eu-west-1.turso.io", # os.environ.get("TURSO_DATABASE_URL"),
+            auth_token="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTA5NTEzNDcsImlkIjoiMDFhMGZjZGYtZGMwMS03YTFjLWEzODUtYjJmYjM5MTlhMzhkIiwia2lkIjoiNjVRSlhuSm0wSk5YcWVRM3FOTk5ZbklGa3pPeWlSTEhZSzllcExqd29CWSIsInJpZCI6Ijc4MjM5MWE3LTQ3YzMtNGJjNS1hMGExLWU2MTkxMGU4NzE4YSJ9.jAnAPzeiHqYkpgnlvy-g4QEuPbQw7lz7sFMA1uY2WgSeQkvAG509_nkaMfS-xXguIxzjtobRxBWFMWGX6FlCCg" # os.environ.get("TURSO_AUTH_TOKEN")
+        )
     return g.db
 
-
 @app.teardown_appcontext
-def close_db(exception=None):
-    db = g.pop("db", None)
+def close_db(exception):
+    db = g.pop('db', None)
     if db is not None:
         db.close()
-
 
 def init_db():
     db = get_db()
@@ -60,7 +60,6 @@ def init_db():
         )
         """
     )
-    db.commit()
 
 
 def login_required(view):
@@ -164,7 +163,7 @@ def index():
 def render_recipe_page(selected_id=None, edit_mode=False, searchterm="", edit_name_value=None, edit_text_value=None):
     rows = get_db().execute(
         "SELECT id, name, text FROM entries ORDER BY name COLLATE NOCASE"
-    ).fetchall()
+    ).rows
     recipes_data = [
         {
             "id": row["id"],
@@ -209,18 +208,16 @@ def recipe_new():
     db = get_db()
     searchterm = request.form.get("searchterm", "")
     try:
-        cursor = db.execute(
+        result = db.execute(
             "INSERT INTO entries (name, text) VALUES (?, ?)",
             (name, ""),
         )
-        db.commit()
-    except sqlite3.Error:
-        db.rollback()
+    except libsql_client.LibsqlError:
         logger.exception("Failed to create entry")
         flash("The entry could not be created. Please try again.", "danger")
         return redirect(url_for("recipes", searchterm=searchterm))
 
-    return redirect(url_for("recipes", selected=cursor.lastrowid, edit=1, searchterm=searchterm))
+    return redirect(url_for("recipes", selected=result.last_insert_rowid, edit=1, searchterm=searchterm))
 
 
 @app.route("/recipes/<int:recipe_id>/rename", methods=["POST"])
@@ -239,15 +236,11 @@ def recipe_rename(recipe_id):
             "UPDATE entries SET name = ? WHERE id = ?",
             (name, recipe_id),
         )
-        db.commit()
-    except sqlite3.Error:
-        db.rollback()
+    except libsql_client.LibsqlError:
+
         logger.exception("Failed to rename entry %s", recipe_id)
         flash("The entry could not be renamed. Please try again.", "danger")
         return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
-
-    if result.rowcount == 0:
-        abort(404)
 
     return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
@@ -269,9 +262,8 @@ def recipe_edit(recipe_id):
             "UPDATE entries SET name = ?, text = ? WHERE id = ?",
             (name, text, recipe_id),
         )
-        db.commit()
-    except sqlite3.Error:
-        db.rollback()
+    except libsql_client.LibsqlError:
+
         logger.exception("Failed to save entry %s", recipe_id)
         flash("The entry could not be saved. Your changes are still in the editor.", "danger")
         return render_recipe_page(
@@ -281,9 +273,6 @@ def recipe_edit(recipe_id):
             edit_name_value=name,
             edit_text_value=text,
         )
-
-    if result.rowcount == 0:
-        abort(404)
 
     return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
 
@@ -295,15 +284,10 @@ def recipe_delete(recipe_id):
     db = get_db()
     try:
         result = db.execute("DELETE FROM entries WHERE id = ?", (recipe_id,))
-        db.commit()
-    except sqlite3.Error:
-        db.rollback()
+    except libsql_client.LibsqlError:
         logger.exception("Failed to delete entry %s", recipe_id)
         flash("The entry could not be deleted. Please try again.", "danger")
         return redirect(url_for("recipes", selected=recipe_id, searchterm=searchterm))
-
-    if result.rowcount == 0:
-        abort(404)
 
     return redirect(url_for("recipes", searchterm=searchterm))
 
